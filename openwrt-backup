@@ -1,0 +1,373 @@
+#!/usr/bin/env ash
+# shellcheck shell=dash
+#
+# OpenWrt Backup
+#
+# Creates a compressed archive of selected folders from the overlay partition,
+# encrypts it with PGP and transfers it to a remote storage location using
+# rsync.
+#
+
+# --------------------------------------------------
+# Settings
+# --------------------------------------------------
+
+# List of directories to backup (space seprarated, without leading '/')
+_BACKUP_DIRS='etc root'
+
+# Backup archive filename
+_ARCHIVE="myrouter.example.net-$(date +'%F_%H-%M-%S')"
+
+# OpenPGP key ID to encrypt backup files to.
+_PGP_ID='0x01234567abcdefgh'
+
+# Remote system to store backups (Rsync over SSH)
+_SSH_HOST='mynas.example.net'
+_SSH_PORT='22'
+_SSH_USER='myrouter'
+_SSH_ID='/root/.ssh/id_rsa'
+_REMOTE_DIR='/volume1/backup/myrouter'
+
+# Where to mail reports, separate by multiple addresses with commas (no spaces).
+# Leave it empty for no mail reports.
+_MAIL_TO="user@example.net"
+
+# When to mail reports (set to 'always' or 'failure' or 'never').
+# By default reports are sent on failure only.
+_SEND_MAIL="failure"
+
+# --------------------------------------------------
+# End Of Settings
+# --------------------------------------------------
+
+# --------------------------------------------------
+# Init
+# --------------------------------------------------
+
+# Abort on any error on unset variables
+set -e -u
+
+# UNIX special events and process signals
+trap '_abort ABRT'   ABRT # Abnomal termination point reched, abort process.
+trap '_cleanup EXIT' HUP INT QUIT ILL QUIT BUS FPE SEGV PIPE ALRM TERM XCPU XFSZ VTALRM PROF PWR
+trap '_cleanup EXIT' EXIT # This always runs at the end, regardless of other signals before.
+
+# Redirect STDOUT (fd1) to fd3 and STDERR (fd2) to fd4
+# for capturing and handling standard and error output
+exec 3>&1 4>&2
+
+# Local system hostname
+_hostname="$(uci get system.@system[0].hostname)"
+
+# Filename of this running script
+_my_name="$(basename "$0")"
+
+# Process ID of this running script
+_my_pid=$$
+
+# Rsync remote connection command
+_rsync_rsh="ssh -p ${_SSH_PORT} -i ${_SSH_ID}"
+
+# Temporary dircetory
+_temp_dir="$(mktemp -p /tmp -d router-backup.XXXXXX)"
+
+# List of extra files to backup, besides the $_BACKUP_DIRS directories
+_files_list=''
+_files_list="$_files_list ${_temp_dir}/opkg-installed.txt"
+_files_list="$_files_list ${_temp_dir}/opkg-user-installed.txt"
+_files_list="$_files_list ${_temp_dir}/opkg-conffiles.txt"
+
+# Source file to transfer with Rsync
+if [ -n "$_PGP_ID" ]; then
+    _source="$_temp_dir/${_ARCHIVE}.tar.gz.gpg"
+else
+    _source="$_temp_dir/${_ARCHIVE}.tar.gz"
+fi
+
+# Destination where to transfer with Rsync
+_target="${_SSH_USER}@${_SSH_HOST}:${_REMOTE_DIR}/"
+
+# File to collect messages
+_log_file="${_temp_dir}/backup.log"
+touch "$_log_file"
+
+# File to use as mail message body
+_mail_file="${_temp_dir}/mail.txt"
+
+# Running interactively or unattended (cron job)
+_interactive=true
+
+# Is this an interactive session?
+if [ -z "$PS1" ]; then
+    _interactive=false
+fi
+
+# --------------------------------------------------
+# Functions
+# --------------------------------------------------
+
+_log_info() {
+
+    # fd3 is the original stdout
+    local _message
+        while IFS= read -r _message; do
+        if [ "$_interactive" = true ]; then
+            # Print the message on the terminal
+            printf "%s[%s] Info: %s\n" "$_my_name" $_my_pid "$_message"
+        else
+            # Log the message to syslog
+            logger -t "${_my_name}[${_my_pid}]" -p user.info "$_message"
+        fi
+
+        # Add the message to the logfile
+        if [ -f "$_log_file" ]; then
+            printf "Info: %s\n" "$_message" >> "$_log_file"
+        fi
+    done >&3
+}
+
+_log_error() {
+
+    # fd4 is the original stderr
+    local _message
+    while IFS= read -r _message; do
+        if [ "$_interactive" = true ]; then
+
+            # Print the message on the terminal
+            printf "%s[%s] Error: %s\n" "$_my_name" $_my_pid "$_message"
+        else
+
+            # Log the message to syslog
+            logger -t "${_my_name}[${_my_pid}]" -p user.err -s "$_message"
+        fi
+
+        # Add the message to the logfile
+        if [ -f "$_log_file" ]; then
+            printf "Error: %s\n" "$_message" >> "$_log_file"
+        fi
+    done >&4
+}
+
+_get_packages() {
+
+    # Get a list of all installed packages
+    /bin/opkg list-installed \
+        > "${_temp_dir}/opkg-installed.txt"
+}
+
+_get_user_packages() {
+
+    # Get a list of 'user installed' packages
+    awk '/^Package:/{PKG= $2} /^Status: .*user installed/{print PKG}' \
+        /usr/lib/opkg/status \
+        > "${_temp_dir}/opkg-user-installed.txt"
+}
+
+_get_user_configs() {
+
+    # Get a list of user changed configuration files
+    /bin/opkg list-changed-conffiles \
+        > "${_temp_dir}/opkg-conffiles.txt"
+}
+
+_create_archive() {
+
+    # Create the backup archive
+    # shellcheck disable=SC2086
+    /bin/tar --create --exclude-backups --auto-compress \
+        --directory=/overlay/upper --one-file-system \
+        --file "${_temp_dir}/${_ARCHIVE}.tar.gz" \
+        $_BACKUP_DIRS $_files_list
+}
+
+_encrypt_archive() {
+
+    # Encrypt the backup archoie
+    /usr/bin/gpg --batch --no-default-recipient --recipient $_PGP_ID \
+        --encrypt "${_temp_dir}/${_ARCHIVE}.tar.gz"
+}
+
+_upload_archive() {
+
+    # Transfer the archive to remote backup storage
+    /usr/bin/rsync --archive --delete --rsh "$_rsync_rsh" \
+        --human-readable \
+        "$_source" "$_target"
+}
+
+_send_mail() {
+
+    # Do we have a mail address?
+    if [ -n "$_MAIL_TO" ]; then
+        sendmail -F"OpenWrt Backup on $_hostname" -f"${USER}@${_hostname}" \
+            "$_MAIL_TO" < "$_mail_file"
+    fi
+}
+
+_abort() {
+
+    echo "Backup failed! Aborting ... " | _log_error
+
+    # Do we have to send out a mail?
+    if [ -n "$_MAIL_TO" ] && [ $_SEND_MAIL != 'never' ]; then
+
+        ( (
+            # Add the subject line at the start of the file
+            cat <<EOF > "$_mail_file"
+X-Mailer: $_my_name
+X-Priority: 2 (High)
+X-MSMail-Priority: High
+Importance: High
+Subject: [${_my_name}] Backup on $_hostname failed!
+
+EOF
+            cat "$_log_file" >> "$_mail_file"
+            echo -n "Sending mail ... "
+            if _send_mail; then
+                echo "ok."
+            else
+                echo "failed!"
+            fi
+
+        ) | _log_info ) 2>&1 | _log_error
+
+    fi
+    _cleanup KILL
+
+}
+
+_cleanup() {
+
+    _kill_signal="$1"
+
+    ( (
+
+        # Clean up when done
+        if [ -n "$_temp_dir" ] && [ -d "$_temp_dir" ]; then
+            echo -n "Cleaning up ... "
+            rm -rf "$_temp_dir"
+            echo "ok."
+        fi
+
+        if [ "$_kill_signal" = "EXIT" ]; then
+            echo "Have a nice day!"
+            kill -KILL "$_my_pid"
+        fi
+
+        if [ "$_kill_signal" = "KILL" ]; then
+            echo "Sorry, I must end it. There's no hope left!"
+            kill -KILL "$_my_pid"
+        fi
+
+    ) | _log_info ) 2>&1 | _log_error
+}
+
+# --------------------------------------------------
+# Main
+# --------------------------------------------------
+
+echo "Starting router backup" | _log_info
+
+( (
+
+    echo -n "Collecting installed software packages ... "
+    if _get_packages; then
+        echo "ok."
+    else
+        echo "failed!"
+        kill -s ABRT "$$"
+    fi
+
+) | _log_info ) 2>&1 | _log_error
+
+( (
+
+    echo -n "Collecting 'user installed' software packages ... "
+    if _get_user_packages; then
+        echo "ok."
+    else
+        echo "failed!"
+        kill -s ABRT "$$"
+    fi
+
+) | _log_info ) 2>&1 | _log_error
+
+( (
+
+    echo -n "Collecting 'user modified' configuration files ... "
+    if _get_user_configs; then
+        echo "ok."
+    else
+        echo "failed!"
+        kill -s ABRT "$$"
+    fi
+
+) | _log_info ) 2>&1 | _log_error
+
+( (
+
+    echo -n "Creating backup archive ... "
+    if _create_archive; then
+        echo "ok."
+    else
+        echo "failed!"
+        kill -s ABRT "$$"
+    fi
+
+) | _log_info ) 2>&1 | _log_error
+
+# Do we have to encrypt the archive?
+if [ -n "$_PGP_ID" ]; then
+
+    ( (
+
+        echo -n "Encrypting backup archive ... "
+        if _encrypt_archive; then
+            echo "ok."
+        else
+            echo "failed!"
+            kill -s ABRT "$$"
+        fi
+
+    ) | _log_info ) 2>&1 | _log_error
+fi
+
+( (
+
+    echo -n "Uploading backup archive to remote host ... "
+    if _upload_archive; then
+        echo "ok."
+    else
+        echo "failed!"
+        kill -s ABRT "$$"
+    fi
+
+) | _log_info ) 2>&1 | _log_error
+
+# If we reach here, our backup was probably successful.
+echo "Backup completed."  | _log_info
+
+# Do we have to send out a mail?
+if [ -n "$_MAIL_TO" ] && [ $_SEND_MAIL = 'always' ]; then
+
+    ( (
+        # Add the subject line at the beginning of the mail
+        cat <<EOF > "$_mail_file"
+X-Mailer: $_my_name
+Precedence: bulk
+Subject: [${_my_name}] Backup on $_hostname was sucessfull
+
+EOF
+        cat "$_log_file" >> "$_mail_file"
+        echo -n "Sending mail ... "
+        if _send_mail; then
+            echo "ok."
+        else
+            echo "failed!"
+            kill -s ABRT "$$"
+        fi
+
+    ) | _log_info ) 2>&1 | _log_error
+
+fi
+exit 0
