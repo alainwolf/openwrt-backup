@@ -47,10 +47,18 @@ _SEND_MAIL="failure"
 # Abort on any error on unset variables
 set -e -u
 
+#
 # UNIX special events and process signals
-trap '_abort ABRT' ABRT # Abnomal termination point reched, abort process.
-trap '_cleanup EXIT' HUP INT QUIT ILL QUIT BUS FPE SEGV PIPE ALRM TERM XCPU XFSZ VTALRM PROF PWR
-trap '_cleanup EXIT' EXIT # This always runs at the end, regardless of other signals before.
+# Abnomal termination point reched, abort process.
+trap '_abort ABRT' ABRT
+trap '_cleanup EXIT' \
+    HUP INT QUIT ILL \
+    QUIT BUS FPE SEGV \
+    PIPE ALRM TERM XCPU \
+    XFSZ VTALRM PROF PWR
+
+# This always runs at the end, regardless of other signals before.
+trap '_cleanup EXIT' EXIT
 
 # Redirect STDOUT (fd1) to fd3 and STDERR (fd2) to fd4
 # for capturing and handling standard and error output
