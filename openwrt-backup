@@ -48,7 +48,7 @@ _SEND_MAIL="failure"
 set -e -u
 
 # UNIX special events and process signals
-trap '_abort ABRT'   ABRT # Abnomal termination point reched, abort process.
+trap '_abort ABRT' ABRT # Abnomal termination point reched, abort process.
 trap '_cleanup EXIT' HUP INT QUIT ILL QUIT BUS FPE SEGV PIPE ALRM TERM XCPU XFSZ VTALRM PROF PWR
 trap '_cleanup EXIT' EXIT # This always runs at the end, regardless of other signals before.
 
@@ -110,7 +110,7 @@ _log_info() {
 
     # fd3 is the original stdout
     local _message
-        while IFS= read -r _message; do
+    while IFS= read -r _message; do
         if [ "$_interactive" = true ]; then
             # Print the message on the terminal
             printf "%s[%s] Info: %s\n" "$_my_name" $_my_pid "$_message"
@@ -121,7 +121,7 @@ _log_info() {
 
         # Add the message to the logfile
         if [ -f "$_log_file" ]; then
-            printf "Info: %s\n" "$_message" >> "$_log_file"
+            printf "Info: %s\n" "$_message" >>"$_log_file"
         fi
     done >&3
 }
@@ -143,7 +143,7 @@ _log_error() {
 
         # Add the message to the logfile
         if [ -f "$_log_file" ]; then
-            printf "Error: %s\n" "$_message" >> "$_log_file"
+            printf "Error: %s\n" "$_message" >>"$_log_file"
         fi
     done >&4
 }
@@ -152,7 +152,7 @@ _get_packages() {
 
     # Get a list of all installed packages
     /bin/opkg list-installed \
-        > "${_temp_dir}/opkg-installed.txt"
+        >"${_temp_dir}/opkg-installed.txt"
 }
 
 _get_user_packages() {
@@ -160,14 +160,14 @@ _get_user_packages() {
     # Get a list of 'user installed' packages
     awk '/^Package:/{PKG= $2} /^Status: .*user installed/{print PKG}' \
         /usr/lib/opkg/status \
-        > "${_temp_dir}/opkg-user-installed.txt"
+        >"${_temp_dir}/opkg-user-installed.txt"
 }
 
 _get_user_configs() {
 
     # Get a list of user changed configuration files
     /bin/opkg list-changed-conffiles \
-        > "${_temp_dir}/opkg-conffiles.txt"
+        >"${_temp_dir}/opkg-conffiles.txt"
 }
 
 _create_archive() {
@@ -200,7 +200,7 @@ _send_mail() {
     # Do we have a mail address?
     if [ -n "$_MAIL_TO" ]; then
         sendmail -F"OpenWrt Backup on $_hostname" -f"${USER}@${_hostname}" \
-            "$_MAIL_TO" < "$_mail_file"
+            "$_MAIL_TO" <"$_mail_file"
     fi
 }
 
@@ -213,7 +213,7 @@ _abort() {
 
         ( (
             # Add the subject line at the start of the file
-            cat <<EOF > "$_mail_file"
+            cat <<EOF >"$_mail_file"
 X-Mailer: $_my_name
 X-Priority: 2 (High)
 X-MSMail-Priority: High
@@ -221,7 +221,7 @@ Importance: High
 Subject: [${_my_name}] Backup on $_hostname failed!
 
 EOF
-            cat "$_log_file" >> "$_mail_file"
+            cat "$_log_file" >>"$_mail_file"
             echo -n "Sending mail ... "
             if _send_mail; then
                 echo "ok."
@@ -229,7 +229,7 @@ EOF
                 echo "failed!"
             fi
 
-        ) | _log_info ) 2>&1 | _log_error
+        ) | _log_info) 2>&1 | _log_error
 
     fi
     _cleanup KILL
@@ -259,7 +259,7 @@ _cleanup() {
             kill -KILL "$_my_pid"
         fi
 
-    ) | _log_info ) 2>&1 | _log_error
+    ) | _log_info) 2>&1 | _log_error
 }
 
 # --------------------------------------------------
@@ -278,7 +278,7 @@ echo "Starting router backup" | _log_info
         kill -s ABRT "$$"
     fi
 
-) | _log_info ) 2>&1 | _log_error
+) | _log_info) 2>&1 | _log_error
 
 ( (
 
@@ -290,7 +290,7 @@ echo "Starting router backup" | _log_info
         kill -s ABRT "$$"
     fi
 
-) | _log_info ) 2>&1 | _log_error
+) | _log_info) 2>&1 | _log_error
 
 ( (
 
@@ -302,7 +302,7 @@ echo "Starting router backup" | _log_info
         kill -s ABRT "$$"
     fi
 
-) | _log_info ) 2>&1 | _log_error
+) | _log_info) 2>&1 | _log_error
 
 ( (
 
@@ -314,7 +314,7 @@ echo "Starting router backup" | _log_info
         kill -s ABRT "$$"
     fi
 
-) | _log_info ) 2>&1 | _log_error
+) | _log_info) 2>&1 | _log_error
 
 # Do we have to encrypt the archive?
 if [ -n "$_PGP_ID" ]; then
@@ -329,7 +329,7 @@ if [ -n "$_PGP_ID" ]; then
             kill -s ABRT "$$"
         fi
 
-    ) | _log_info ) 2>&1 | _log_error
+    ) | _log_info) 2>&1 | _log_error
 fi
 
 ( (
@@ -342,23 +342,23 @@ fi
         kill -s ABRT "$$"
     fi
 
-) | _log_info ) 2>&1 | _log_error
+) | _log_info) 2>&1 | _log_error
 
 # If we reach here, our backup was probably successful.
-echo "Backup completed."  | _log_info
+echo "Backup completed." | _log_info
 
 # Do we have to send out a mail?
 if [ -n "$_MAIL_TO" ] && [ $_SEND_MAIL = 'always' ]; then
 
     ( (
         # Add the subject line at the beginning of the mail
-        cat <<EOF > "$_mail_file"
+        cat <<EOF >"$_mail_file"
 X-Mailer: $_my_name
 Precedence: bulk
 Subject: [${_my_name}] Backup on $_hostname was sucessfull
 
 EOF
-        cat "$_log_file" >> "$_mail_file"
+        cat "$_log_file" >>"$_mail_file"
         echo -n "Sending mail ... "
         if _send_mail; then
             echo "ok."
@@ -367,7 +367,7 @@ EOF
             kill -s ABRT "$$"
         fi
 
-    ) | _log_info ) 2>&1 | _log_error
+    ) | _log_info) 2>&1 | _log_error
 
 fi
 exit 0
