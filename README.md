@@ -65,11 +65,11 @@ The following command, used on your router, will store your key in its public
 keyring:
 
     $ PGPKEY=0x0123456789ABCDEF
-    $ gpg --keyserver hkps://keys.openpgp.org --search-keys PGPKEY
+    $ gpg --keyserver hkps://keys.openpgp.org --search-keys $PGPKEY
 
 The router then needs ultimate trust to your:
 
-    $ gpg --edit-key PGPKEY
+    $ gpg --edit-key $PGPKEY
     gpg> trust
     1 = I don't know or won't say
     2 = I do NOT trust
