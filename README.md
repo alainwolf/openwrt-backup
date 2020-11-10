@@ -13,6 +13,7 @@ encrypts it with PGP and uploads it to a remote storage location using
 * OpenPGP encrypted backup archive;
 * SSH secured passwordless file transfer;
 * Sends out mail reports on failure (or always if you wish so).
+* Avoids writing to the flash storage.
 
 
 ### Required Software
@@ -87,3 +88,58 @@ The router then needs ultimate trust to your:
 To send you the mail reports, your router needs a mail sever, where he is
 allowed to send mail from. Any OpenWrt package, which provides the `sendmail`
 command will do. The `ssmtp` package seems to be a popular choice.
+
+
+### Installation
+
+I suggest saving the script in your /root directory on the router. So it will be included in the backups. Be sure to make it executable:
+
+    $ chmod 0764 /root/openwrt-backup
+
+
+### Configuration
+
+Fill out the variables on top of the script between `Settings` and `End of Settings`. You should not touch anything below, unless you know what you are doing.
+
+
+### Cron-Job
+
+Use the crontab -e command to add a line like the following to have backups created automatically on schedule:
+
+    #min hour mday month wday cmd
+    00   02   *    *     *    /root/openwrt-backup
+
+
+### Motivation
+
+While this might seem a bit overstreched for the mere backup of a home router, which usually runs quietly and doesn't even change much ...
+
+I could be done with 3 commandlines dropped into a crontab.
+
+I wrote this mostly as a exercise to get a grip on some issues wich I kept bumping against over an over.
+
+I run shell scripts on many different systems, on some of them (especially the embedded ones) there is no bash available.
+
+I use most of these automated (e.g. cronjobs) and interactive. Since a long time I wanted them to be able to handle both properly including ...
+
+   * Display messages only if started interactively
+   * Log to syslog, but only if automated
+   * Separate error output from non-error to handle accordingly.
+   * Log with the right tags and priorities in syslog.
+   * Get mail reports, also when cron does not provide it (busybox).
+   * Get mail reports only on failures (cron just sends you everything).
+   * Let programs still use their I/Os despite all the perma-redirecting.
+   * Properly handle error conditions with traps.
+   * Handle errors without the ERR signal (dash).
+   * All while still remaining portable.
+
+What this script is actually doing, after I have mastered all these goals, is not so important ;-)
+
+So after a lot of StackExchange reading and re-trying, here is what I learned:
+
+   * Move (almost) everything into functions.
+   * Use nested subshells for output redirection.
+   * Wrap (almost) every function into these subshells, each seprately.
+   * Don't assume. Send trap/process signals yourself.
+   * Who needs ERR, when there are 30+ other signals to choose from?
+
