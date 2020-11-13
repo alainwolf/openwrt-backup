@@ -49,6 +49,8 @@ set -e -u
 
 #
 # UNIX special events and process signals
+#
+
 # Abnomal termination point reched, abort process.
 trap '_abort ABRT' ABRT
 trap '_cleanup EXIT' \
@@ -60,7 +62,16 @@ trap '_cleanup EXIT' \
 # This always runs at the end, regardless of other signals before.
 trap '_cleanup EXIT' EXIT
 
-# Redirect STDOUT (fd1) to fd3 and STDERR (fd2) to fd4
+#
+# Is this an interactive shell session?
+#
+true=0
+false=1
+
+# Interactive shells hava a terminal attached to sdin (fd0))
+[ -t 0 ] && _interactive=$true || _interactive=$false
+
+# Redirect stdout (fd1) to fd3 and stderr (fd2) to fd4
 # for capturing and handling standard and error output
 exec 3>&1 4>&2
 
@@ -102,13 +113,6 @@ touch "$_log_file"
 # File to use as mail message body
 _mail_file="${_temp_dir}/mail.txt"
 
-# Running interactively or unattended (cron job)
-_interactive=true
-
-# Is this an interactive session?
-if [ -z "$PS1" ]; then
-    _interactive=false
-fi
 
 # --------------------------------------------------
 # Functions
@@ -119,14 +123,16 @@ _log_info() {
     # fd3 is the original stdout
     local _message
     while IFS= read -r _message; do
-        if [ "$_interactive" = true ]; then
+        if [ $_interactive -eq $true ] ; then
+
             # Print the message on the terminal
             printf "%s[%s] Info: %s\n" "$_my_name" $_my_pid "$_message"
         else
+        
             # Log the message to syslog
             logger -t "${_my_name}[${_my_pid}]" -p user.info "$_message"
         fi
-
+        
         # Add the message to the logfile
         if [ -f "$_log_file" ]; then
             printf "Info: %s\n" "$_message" >>"$_log_file"
@@ -139,7 +145,7 @@ _log_error() {
     # fd4 is the original stderr
     local _message
     while IFS= read -r _message; do
-        if [ "$_interactive" = true ]; then
+        if [ $_interactive -eq $true ] ; then
 
             # Print the message on the terminal
             printf "%s[%s] Error: %s\n" "$_my_name" $_my_pid "$_message"
@@ -220,6 +226,7 @@ _abort() {
     if [ -n "$_MAIL_TO" ] && [ $_SEND_MAIL != 'never' ]; then
 
         ( (
+
             # Add the subject line at the start of the file
             cat <<EOF >"$_mail_file"
 X-Mailer: $_my_name
@@ -246,7 +253,7 @@ EOF
 
 _cleanup() {
 
-    _kill_signal="$1"
+    local _kill_signal="$1"
 
     ( (
 
@@ -283,7 +290,7 @@ echo "Starting router backup" | _log_info
         echo "ok."
     else
         echo "failed!"
-        kill -s ABRT "$$"
+        kill -s ABRT "$_my_pid"
     fi
 
 ) | _log_info) 2>&1 | _log_error
@@ -295,7 +302,7 @@ echo "Starting router backup" | _log_info
         echo "ok."
     else
         echo "failed!"
-        kill -s ABRT "$$"
+        kill -s ABRT "$_my_pid"
     fi
 
 ) | _log_info) 2>&1 | _log_error
@@ -307,7 +314,7 @@ echo "Starting router backup" | _log_info
         echo "ok."
     else
         echo "failed!"
-        kill -s ABRT "$$"
+        kill -s ABRT "$_my_pid"
     fi
 
 ) | _log_info) 2>&1 | _log_error
@@ -319,7 +326,7 @@ echo "Starting router backup" | _log_info
         echo "ok."
     else
         echo "failed!"
-        kill -s ABRT "$$"
+        kill -s ABRT "$_my_pid"
     fi
 
 ) | _log_info) 2>&1 | _log_error
@@ -334,7 +341,7 @@ if [ -n "$_PGP_ID" ]; then
             echo "ok."
         else
             echo "failed!"
-            kill -s ABRT "$$"
+            kill -s ABRT "$_my_pid"
         fi
 
     ) | _log_info) 2>&1 | _log_error
@@ -347,7 +354,7 @@ fi
         echo "ok."
     else
         echo "failed!"
-        kill -s ABRT "$$"
+        kill -s ABRT "$_my_pid"
     fi
 
 ) | _log_info) 2>&1 | _log_error
@@ -359,6 +366,7 @@ echo "Backup completed." | _log_info
 if [ -n "$_MAIL_TO" ] && [ $_SEND_MAIL = 'always' ]; then
 
     ( (
+
         # Add the subject line at the beginning of the mail
         cat <<EOF >"$_mail_file"
 X-Mailer: $_my_name
@@ -372,7 +380,7 @@ EOF
             echo "ok."
         else
             echo "failed!"
-            kill -s ABRT "$$"
+            kill -s ABRT "$_my_pid"
         fi
 
     ) | _log_info) 2>&1 | _log_error
