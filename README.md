@@ -1,4 +1,4 @@
-# Openwrt Backup
+# OpenWrt Backup
 
 A backup script for your OpenWrt (or Turris) router.
 
@@ -38,24 +38,23 @@ login with an SSH public key on that server.
 
 To create an SSH key-pair on OpenWrt:
 
-    $ cd /root
-    $ mkdir -p .ssh
-    $ dropbearkey -t rsa -f .ssh/id_rsa
-    $ chmod 0700 /root/.ssh
-    $ chmod 0600 /root/.ssh/id_rsa
+    $ mkdir -p ~/.ssh
+    $ dropbearkey -t rsa -f ~/.ssh/id_rsa
+    $ dropbearkey -f ~/.ssh/id_rsa -y > ~/.ssh/id_rsa.pub
+    $ chmod 0700 ~/.ssh
+    $ chmod 0600 ~/.ssh/id_rsa
 
-The command will print out the public key and fingerprint when done.
+Turris Omnia routers use OpenSSH where which includes `ssh-keygen`:
 
-Unlike OpenSSH, Dropbear will not create public key files along with your
-private keys. To export the public key again:
-
-    $ dropbearkey -f .ssh/id_rsa -y
-
-Turris routers have OpenSSH where which includes `ssh-keygen`:
-
-    $ cd /root
-    $ mkdir -p .ssh
+    $ mkdir -p ~/.ssh
     $ ssh-keygen
+
+The following command will print out the public key:
+
+    $ cat ~/.ssh/id_rsa.pub
+
+Add the contents of the public key file `/root/.ssh/id_rsa.pub` on the router to
+the users `~/.ssh/authorized_keys` file on on remote server.
 
 
 ### OpenPGP Keys
@@ -99,12 +98,16 @@ I suggest saving the script in your /root directory on the router. So it will be
 
 ### Configuration
 
-Fill out the variables on top of the script between `Settings` and `End of Settings`. You should not touch anything below, unless you know what you are doing.
+Copy the provided sample configuration file:
+
+    $ cp /root/openwrt-backup.conf.sample /root/openwrt-backup.conf
+
+Fill out the variables according to your needs.
 
 
 ### Cron-Job
 
-Use the crontab -e command to add a line like the following to have backups created automatically on schedule:
+Use the `crontab -e` command to add a line like the following to have backups created automatically on schedule:
 
     #min hour mday month wday cmd
     00   02   *    *     *    /root/openwrt-backup
@@ -114,9 +117,9 @@ Use the crontab -e command to add a line like the following to have backups crea
 
 While this might seem a bit overstreched for the mere backup of a home router, which usually runs quietly and doesn't even change much ...
 
-I could be done with 3 commandlines dropped into a crontab.
+I could be done with 3 command-lines dropped into a crontab.
 
-I wrote this mostly as a exercise to get a grip on some issues wich I kept bumping against over an over.
+I wrote this mostly as a exercise to get a grip on some issues which I kept bumping against over an over.
 
 I run shell scripts on many different systems, on some of them (especially the embedded ones) there is no bash available.
 
@@ -139,7 +142,7 @@ So after a lot of StackExchange reading and re-trying, here is what I learned:
 
    * Move (almost) everything into functions.
    * Use nested subshells for output redirection.
-   * Wrap (almost) every function into these subshells, each seprately.
+   * Wrap (almost) every function into these subshells, each separately.
    * Don't assume. Send trap/process signals yourself.
    * Who needs ERR, when there are 30+ other signals to choose from?
 
