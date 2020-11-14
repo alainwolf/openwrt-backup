@@ -12,33 +12,10 @@
 # Settings
 # --------------------------------------------------
 
-# List of directories to backup (space seprarated, without leading '/')
-_BACKUP_DIRS='etc root'
+# Read settings from conf file
+# shellcheck source=./openwrt-backup.conf
+. "${0}.conf"
 
-# Backup archive filename
-_ARCHIVE="myrouter.example.net-$(date +'%F_%H-%M-%S')"
-
-# OpenPGP key ID to encrypt backup files to.
-_PGP_ID='0x01234567abcdefgh'
-
-# Remote system to store backups (Rsync over SSH)
-_SSH_HOST='mynas.example.net'
-_SSH_PORT='22'
-_SSH_USER='myrouter'
-_SSH_ID='/root/.ssh/id_rsa'
-_REMOTE_DIR='/volume1/backup/myrouter'
-
-# Where to mail reports, separate by multiple addresses with commas (no spaces).
-# Leave it empty for no mail reports.
-_MAIL_TO="user@example.net"
-
-# When to mail reports (set to 'always' or 'failure' or 'never').
-# By default reports are sent on failure only.
-_SEND_MAIL="failure"
-
-# --------------------------------------------------
-# End Of Settings
-# --------------------------------------------------
 
 # --------------------------------------------------
 # Init
