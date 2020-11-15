@@ -91,7 +91,8 @@ command will do. The `ssmtp` package seems to be a popular choice.
 
 ### Installation
 
-I suggest saving the script in your /root directory on the router. So it will be included in the backups. Be sure to make it executable:
+I suggest saving the script in your /root directory on the router. So it will be
+included in the backups. Be sure to make it executable:
 
     $ chmod 0764 /root/openwrt-backup
 

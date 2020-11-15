@@ -3,6 +3,9 @@
 #
 # OpenWrt Backup
 #
+# https://github.com/alainwolf/openwrt-backup
+# Copyright (C) 2020 Alain Wolf <alain@alainwolf.ch>
+#
 # Creates a compressed archive of selected folders from the overlay partition,
 # encrypts it with PGP and transfers it to a remote storage location using
 # rsync.
@@ -13,7 +16,7 @@
 # --------------------------------------------------
 
 # Read settings from conf file
-# shellcheck source=./openwrt-backup.conf
+# shellcheck source=./openwrt-backup.conf.sample
 . "${0}.conf"
 
 
@@ -28,7 +31,7 @@ set -e -u
 # UNIX special events and process signals
 #
 
-# Abnomal termination point reched, abort process.
+# Abnomal termination, abort process.
 trap '_abort ABRT' ABRT
 trap '_cleanup EXIT' \
     HUP INT QUIT ILL \
@@ -45,7 +48,7 @@ trap '_cleanup EXIT' EXIT
 true=0
 false=1
 
-# Interactive shells hava a terminal attached to sdin (fd0))
+# Interactive shells hav a a terminal attached to sdin (fd0))
 [ -t 0 ] && _interactive=$true || _interactive=$false
 
 # Redirect stdout (fd1) to fd3 and stderr (fd2) to fd4
@@ -64,7 +67,7 @@ _my_pid=$$
 # Rsync remote connection command
 _rsync_rsh="ssh -p ${_SSH_PORT} -i ${_SSH_ID}"
 
-# Temporary dircetory
+# Temporary directory
 _temp_dir="$(mktemp -p /tmp -d router-backup.XXXXXX)"
 
 # List of extra files to backup, besides the $_BACKUP_DIRS directories
@@ -105,12 +108,12 @@ _log_info() {
             # Print the message on the terminal
             printf "%s[%s] Info: %s\n" "$_my_name" $_my_pid "$_message"
         else
-        
+
             # Log the message to syslog
             logger -t "${_my_name}[${_my_pid}]" -p user.info "$_message"
         fi
-        
-        # Add the message to the logfile
+
+        # Add the message to the log-file
         if [ -f "$_log_file" ]; then
             printf "Info: %s\n" "$_message" >>"$_log_file"
         fi
@@ -132,7 +135,7 @@ _log_error() {
             logger -t "${_my_name}[${_my_pid}]" -p user.err -s "$_message"
         fi
 
-        # Add the message to the logfile
+        # Add the message to the log-file
         if [ -f "$_log_file" ]; then
             printf "Error: %s\n" "$_message" >>"$_log_file"
         fi
@@ -173,8 +176,8 @@ _create_archive() {
 
 _encrypt_archive() {
 
-    # Encrypt the backup archoie
-    /usr/bin/gpg --batch --no-default-recipient --recipient $_PGP_ID \
+    # Encrypt the backup archive
+    /usr/bin/gpg --batch --no-default-recipient --recipient "$_PGP_ID" \
         --encrypt "${_temp_dir}/${_ARCHIVE}.tar.gz"
 }
 
@@ -200,7 +203,7 @@ _abort() {
     echo "Backup failed! Aborting ... " | _log_error
 
     # Do we have to send out a mail?
-    if [ -n "$_MAIL_TO" ] && [ $_SEND_MAIL != 'never' ]; then
+    if [ -n "$_MAIL_TO" ] && [ "$_SEND_MAIL" != 'never' ]; then
 
         ( (
 
@@ -340,7 +343,7 @@ fi
 echo "Backup completed." | _log_info
 
 # Do we have to send out a mail?
-if [ -n "$_MAIL_TO" ] && [ $_SEND_MAIL = 'always' ]; then
+if [ -n "$_MAIL_TO" ] && [ "$_SEND_MAIL" = 'always' ]; then
 
     ( (
 
@@ -348,7 +351,7 @@ if [ -n "$_MAIL_TO" ] && [ $_SEND_MAIL = 'always' ]; then
         cat <<EOF >"$_mail_file"
 X-Mailer: $_my_name
 Precedence: bulk
-Subject: [${_my_name}] Backup on $_hostname was sucessfull
+Subject: [${_my_name}] Backup on $_hostname was successful
 
 EOF
         cat "$_log_file" >>"$_mail_file"
