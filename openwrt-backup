@@ -193,8 +193,7 @@ _send_mail() {
 
     # Do we have a mail address?
     if [ -n "$_MAIL_TO" ]; then
-        sendmail -F"OpenWrt Backup on $_hostname" -f"${USER}@${_hostname}" \
-            "$_MAIL_TO" <"$_mail_file"
+        /usr/sbin/sendmail "$_MAIL_TO" <"$_mail_file"
     fi
 }
 
