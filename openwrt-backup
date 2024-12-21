@@ -1,15 +1,15 @@
 #!/usr/bin/env ash
-# shellcheck shell=dash
-#
+# shellcheck shell=dash disable=SC2317
+# ****************************************************************************
 # OpenWrt Backup
 #
 # https://github.com/alainwolf/openwrt-backup
-# Copyright (C) 2020 Alain Wolf <alain@alainwolf.ch>
+# Copyright (C) 2024 Alain Wolf <alain@alainwolf.ch>
 #
 # Creates a compressed archive of selected folders from the overlay partition,
 # encrypts it with PGP and transfers it to a remote storage location using
 # rsync.
-#
+# ****************************************************************************
 
 # --------------------------------------------------
 # Settings
@@ -18,7 +18,6 @@
 # Read settings from conf file
 # shellcheck source=./openwrt-backup.conf.sample
 . "${0}.conf"
-
 
 # --------------------------------------------------
 # Init
@@ -93,7 +92,6 @@ touch "$_log_file"
 # File to use as mail message body
 _mail_file="${_temp_dir}/mail.txt"
 
-
 # --------------------------------------------------
 # Functions
 # --------------------------------------------------
@@ -103,7 +101,7 @@ _log_info() {
     # fd3 is the original stdout
     local _message
     while IFS= read -r _message; do
-        if [ $_interactive -eq $true ] ; then
+        if [ "$_interactive" -eq $true ]; then
 
             # Print the message on the terminal
             printf "%s[%s] Info: %s\n" "$_my_name" $_my_pid "$_message"
@@ -125,7 +123,7 @@ _log_error() {
     # fd4 is the original stderr
     local _message
     while IFS= read -r _message; do
-        if [ $_interactive -eq $true ] ; then
+        if [ "$_interactive" -eq $true ]; then
 
             # Print the message on the terminal
             printf "%s[%s] Error: %s\n" "$_my_name" $_my_pid "$_message"
@@ -168,8 +166,8 @@ _create_archive() {
 
     # Create the backup archive
     # shellcheck disable=SC2086
-    /bin/tar --create --exclude-backups --auto-compress \
-        --directory=/overlay/upper --one-file-system \
+    tar --create --exclude-backups --auto-compress \
+        --directory=/ --one-file-system \
         --file "${_temp_dir}/${_ARCHIVE}.tar.gz" \
         $_BACKUP_DIRS $_files_list
 }
@@ -193,12 +191,11 @@ _send_mail() {
 
     # Do we have a mail address?
     if [ -n "$_MAIL_TO" ]; then
-        /usr/sbin/sendmail "$_MAIL_TO" <"$_mail_file"
+        sendmail "$_MAIL_TO" <"$_mail_file"
     fi
 }
 
 _abort() {
-
     echo "Backup failed! Aborting ... " | _log_error
 
     # Do we have to send out a mail?
