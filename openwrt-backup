@@ -82,9 +82,6 @@ else
     _source="$_temp_dir/${_ARCHIVE}.tar.gz"
 fi
 
-# Destination where to transfer with Rsync
-_target="${_SSH_USER}@${_SSH_HOST}:${_REMOTE_DIR}/"
-
 # File to collect messages
 _log_file="${_temp_dir}/backup.log"
 touch "$_log_file"
