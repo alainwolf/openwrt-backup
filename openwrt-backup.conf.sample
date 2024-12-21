@@ -18,7 +18,7 @@ _BACKUP_DIRS='etc root'
 # Backup archive filename
 _ARCHIVE="myrouter.example.net-$(date +'%F_%H-%M-%S')"
 
-# OpenPGP key ID to encrypt backup files to.
+# OpenPGP key ID to encrypt backup files to. Comment out to disable encryption.
 _PGP_ID='0x01234567abcdefgh'
 
 # Remote system(s) to store backups (Rsync over SSH)
@@ -38,6 +38,10 @@ _MAIL_TO="user@example.net"
 # When to mail reports (set to 'always' or 'failure' or 'never').
 # By default reports are sent on failure only.
 _SEND_MAIL="failure"
+
+# Health checks UUID for reporting success/failure. Comment out to disable.
+# https://healthchecks.io/
+_HC_PING="00000000-aaaa-bbbb-cccc-dddddddddddd"
 
 # --------------------------------------------------
 # End Of Settings

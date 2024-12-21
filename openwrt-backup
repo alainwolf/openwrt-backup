@@ -243,11 +243,27 @@ _cleanup() {
         fi
 
         if [ "$_kill_signal" = "EXIT" ]; then
+
+            # Do we have a healthchecks.io UUID?
+            if [ -n "$_HC_PING" ]; then
+
+                # Report 'success' to healthchecks.io
+                curl -fsS -m 10 --retry 5 -o /dev/null "https://hc-ping.com/${_HC_PING}"
+            fi
+
             echo "Have a nice day!"
             kill -KILL "$_my_pid"
         fi
 
         if [ "$_kill_signal" = "KILL" ]; then
+
+            # Do we have a healthchecks.io UUID?
+            if [ -n "$_HC_PING" ]; then
+
+                # Report 'fail' to healthchecks.io
+                curl -fsS -m 10 --retry 5 -o /dev/null "https://hc-ping.com/${_HC_PING}/fail"
+            fi
+
             echo "Sorry, I must end it. There's no hope left!"
             kill -KILL "$_my_pid"
         fi
@@ -260,6 +276,13 @@ _cleanup() {
 # --------------------------------------------------
 
 echo "Starting router backup" | _log_info
+
+# Do we have a healthchecks.io UUID?
+if [ -n "$_HC_PING" ]; then
+
+    # Report 'start' to healthchecks.io
+    curl -fsS -m 10 --retry 5 -o /dev/null "https://hc-ping.com/${_HC_PING}/start"
+fi
 
 ( (
 
