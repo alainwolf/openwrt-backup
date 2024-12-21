@@ -64,7 +64,7 @@ _my_name="$(basename "$0")"
 _my_pid=$$
 
 # Rsync remote connection command
-_rsync_rsh="ssh -p ${_SSH_PORT} -i ${_SSH_ID}"
+_rsync_rsh="ssh -i ${_SSH_ID}"
 
 # Temporary directory
 _temp_dir="$(mktemp -p /tmp -d router-backup.XXXXXX)"
@@ -180,11 +180,13 @@ _encrypt_archive() {
 }
 
 _upload_archive() {
+    for _target in $_SERVERS; do
 
-    # Transfer the archive to remote backup storage
-    /usr/bin/rsync --archive --delete --rsh "$_rsync_rsh" \
-        --human-readable \
-        "$_source" "$_target"
+        # Transfer the archive to remote backup storage
+        /usr/bin/rsync --archive --delete --rsh "$_rsync_rsh" \
+            --human-readable \
+            "$_source" "$_target"
+    done
 }
 
 _send_mail() {

@@ -21,12 +21,15 @@ _ARCHIVE="myrouter.example.net-$(date +'%F_%H-%M-%S')"
 # OpenPGP key ID to encrypt backup files to.
 _PGP_ID='0x01234567abcdefgh'
 
-# Remote system to store backups (Rsync over SSH)
-_SSH_HOST='mynas.example.net'
-_SSH_PORT='22'
-_SSH_USER='myrouter'
-_SSH_ID='/root/.ssh/id_rsa'
-_REMOTE_DIR='/volume1/backup/myrouter'
+# Remote system(s) to store backups (Rsync over SSH)
+# Use ~/.ssh/config to define custom ports and options for each server.
+_SERVERS="
+    server1.example.net:/volume1/backup/myrouter
+    server2.example.net:/volume1/backup/myrouter
+    "
+
+# SSH private key
+_SSH_ID='/root/.ssh/id_ed25519'
 
 # Where to mail reports, separate by multiple addresses with commas (no spaces).
 # Leave it empty for no mail reports.
